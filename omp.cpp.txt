@@ -1,0 +1,132 @@
+#include <omp.h>
+#include <algorithm>
+#include <cstdio>
+#include <time.h>
+#include <iostream>
+using namespace std;
+/*串行快排的函数*/
+void serial_quicksort(float* b, long l, long r) {
+    long i = l, j = r;
+    float temp = b[i];
+    if (i > j) return;
+    if (i <= j) {
+        while (i <= j && b[j] > temp) j--;
+        swap(b[i], b[j]);
+        while (i <= j && b[i] < temp) i++;
+        swap(b[i], b[j]);
+    }
+    serial_quicksort(b, l, i - 1);
+    serial_quicksort(b, i + 1, r);
+}
+//void serial_quickSort(float* b, const long n) {
+//    long i = 0, j = n;
+//    float pivot = b[n / 2];
+//    do {
+//        while (b[i] < pivot) {
+//            i++;
+//        }
+//        while (b[j] > pivot) {
+//            j--;
+//        }
+//        if (i <= j) {
+//            swap(b[i], b[j]);
+//            i++; j--;
+//        }
+//    } while (i <= j);
+//    if (j > 0) {
+//        serial_quickSort(b, j);
+//    }
+//    if (n > i) {
+//        serial_quickSort(b + i, n - i);
+//    }
+//}
+/*并行快排的函数*/
+void parallel_quickSort(float* a, const long n) {
+    long i = 0, j = n;
+    float pivot = a[n / 2];
+
+    do {
+        while (a[i] < pivot) i++;
+        while (a[j] > pivot) j--;
+
+        if (i <= j) {
+            swap(a[i], a[j]);
+            i++; j--;
+        }
+    } while (i <= j);
+
+    if (n < 100) {
+        if (j > 0) parallel_quickSort(a, j);
+        if (n > i) parallel_quickSort(a + i, n - i);
+        return;
+    }
+//分配任务
+#pragma omp task
+    if (j > 0) parallel_quickSort(a, j);
+#pragma omp task
+    if (n > i) parallel_quickSort(a + i, n - i);
+}
+int main() {
+    double startTime, stopTime;
+    clock_t startTime2, stopTime2;
+    float* a, * b, * c;
+    long n;
+    //获取数组大小，运行后手动输入
+    cout << "Enter array size: ";
+    cin >> n;
+    
+    a = new float[n];
+    b = new float[n];
+    //c = new float[n];
+    //随机为数组初始化，如果不设置srand(),则每次得到的数组都是固定的
+    //srand(time(NULL));
+    for (int i = 0; i < n; ++i) {
+        a[i] = rand();
+        b[i] = a[i];
+        //c[i] = a[i];
+    }
+ /*并行开始*/
+    startTime = clock();
+#pragma omp parallel num_threads(8)
+    {
+       // cout << "设置线程数为: " << endl;
+#pragma omp single
+        {
+            parallel_quickSort(a, n - 1);
+        }
+    }
+    stopTime = clock();
+    double time1 = stopTime - startTime;
+    printf("\nSorted parallel: %f seconds \n\n", time1/1000);
+/*并行结束*/
+///////////////////////////////
+ /*串行开始*/
+    startTime2 = clock();
+    serial_quicksort(b, 0,n-1 );
+    stopTime2 = clock();
+    double time2 = stopTime2 - startTime2;
+    printf("\nSorted serial: %f seconds \n\n", (double)(time2) / 1000);
+/*串行结束*/
+
+ //计算加速比
+    double jiasubi = time2 / time1;
+    printf("加速比是：%f\n", jiasubi);
+    //用来检验一下用来串行和并行的数组是否一模一样
+    bool correctResult = true;
+    int i = 0;
+    while (correctResult && (i < n))
+    {
+        if (a[i] != b[i]) { correctResult = false; }
+        i++;
+    }
+
+    if (correctResult) {
+        printf("The results are identical\n");
+    }
+    else {
+        printf("The results are incorrect\n");
+    }
+//不要忘记delete！
+    delete[] a;
+    delete[] b;
+}
